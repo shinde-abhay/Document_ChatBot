@@ -22,10 +22,8 @@ load_dotenv()
 DB_URL = os.getenv("DATABASE_URL")
 os.environ["GEMINI_API_KEY"] = os.getenv("GEMINI_API_KEY")
 
-# ✅ CREATE APP FIRST (moved to the top)
 app = FastAPI()
 
-# ✅ ADD CORS MIDDLEWARE (only once, right after app creation)
 app.add_middleware(
     CORSMiddleware,
     allow_origins=[
@@ -38,7 +36,6 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-# --- RAG Setup ---
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 FAISS_PATH = os.path.join(BASE_DIR, "..", "faiss_index")
 UPLOAD_DIR = os.path.join(BASE_DIR, "user_uploads")
@@ -91,19 +88,12 @@ class UserRequest(BaseModel):
     username: str
 
 
-# --- API Endpoints ---
-
-# Health check endpoint (for Railway monitoring)
 @app.get("/health")
 def health_check():
     """Health check endpoint for deployment monitoring"""
     return {"status": "ok", "service": "Document ChatBot API"}
 
 
-# Login/signup endpoint
-# NOTE: Demo project — this uses simple username-based sessions with no
-# password authentication. Not suitable for handling real user data.
-# A production version would add password auth (hashing + login) or OAuth.
 @app.post("/get_or_create_user")
 def get_or_create_user(req: UserRequest):
     conn = get_db_conn()
