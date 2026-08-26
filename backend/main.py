@@ -23,13 +23,14 @@ DB_URL = os.getenv("DATABASE_URL")
 os.environ["GEMINI_API_KEY"] = os.getenv("GEMINI_API_KEY")
 
 app = FastAPI()
+FRONTEND_URL = os.getenv("FRONTEND_URL", "http://localhost:8501")
 
 app.add_middleware(
     CORSMiddleware,
     allow_origins=[
-        "https://document-chatbot-frontend-prod.up.railway.app",  # Railway prod
-        "http://localhost:8501",                                   # Local Streamlit dev
-        "http://localhost:3000",                                   # Alternative local
+        FRONTEND_URL,
+        "http://localhost:8501",
+        "http://localhost:3000",
     ],
     allow_credentials=True,
     allow_methods=["*"],
