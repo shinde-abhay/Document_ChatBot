@@ -22,6 +22,21 @@ load_dotenv()
 DB_URL = os.getenv("DATABASE_URL")
 os.environ["GEMINI_API_KEY"] = os.getenv("GEMINI_API_KEY")
 
+# ✅ CREATE APP FIRST (moved to the top)
+app = FastAPI()
+
+# ✅ ADD CORS MIDDLEWARE (only once, right after app creation)
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=[
+        "https://document-chatbot-frontend-prod.up.railway.app",  # Railway prod
+        "http://localhost:8501",                                   # Local Streamlit dev
+        "http://localhost:3000",                                   # Alternative local
+    ],
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
 
 # --- RAG Setup ---
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
@@ -30,18 +45,9 @@ UPLOAD_DIR = os.path.join(BASE_DIR, "user_uploads")
 USER_INDEX_DIR = os.path.join(BASE_DIR, "user_indexes")
 os.makedirs(UPLOAD_DIR, exist_ok=True)
 os.makedirs(USER_INDEX_DIR, exist_ok=True)
+
 user_chains = {}
-app.add_middleware(
-    CORSMiddleware,
-    allow_origins=[
-        "https://document-chatbot-frontend-prod.up.railway.app",  # Railway prod
-        "http://localhost:8501",                                   # Local dev
-        "http://localhost:3000",                                   # Alternative local
-    ],
-    allow_credentials=True,
-    allow_methods=["*"],
-    allow_headers=["*"],
-)
+
 print("Loading embeddings...")
 embeddings = HuggingFaceEmbeddings(model_name="sentence-transformers/all-MiniLM-L6-v2")
 
@@ -66,14 +72,7 @@ prompt = ChatPromptTemplate.from_messages(
 
 qa_chain = create_stuff_documents_chain(llm, prompt)
 
-app = FastAPI()
 
-app.add_middleware(
-    CORSMiddleware,
-    allow_origins=["*"],
-    allow_methods=["*"],
-    allow_headers=["*"]
-)
 def get_db_conn():
     conn = psycopg2.connect(DB_URL)
     return conn
@@ -91,13 +90,20 @@ class HistoryRequest(BaseModel):
 class UserRequest(BaseModel):
     username: str
 
-#api endpoint
 
-#login/signup
+# --- API Endpoints ---
+
+# Health check endpoint (for Railway monitoring)
+@app.get("/health")
+def health_check():
+    """Health check endpoint for deployment monitoring"""
+    return {"status": "ok", "service": "Document ChatBot API"}
+
+
+# Login/signup endpoint
 # NOTE: Demo project — this uses simple username-based sessions with no
 # password authentication. Not suitable for handling real user data.
 # A production version would add password auth (hashing + login) or OAuth.
-
 @app.post("/get_or_create_user")
 def get_or_create_user(req: UserRequest):
     conn = get_db_conn()
@@ -126,8 +132,8 @@ def get_or_create_user(req: UserRequest):
         cur.close()
         conn.close()
 
-#chat history
 
+# Get chat history endpoint
 @app.post("/get_history")
 def get_history(req: HistoryRequest):
     conn = get_db_conn()
@@ -146,7 +152,9 @@ def get_history(req: HistoryRequest):
         cur.close()
         conn.close()
 
+
 def get_loader_for_file(file_path: str, filename: str):
+    """Get appropriate document loader based on file extension"""
     ext = filename.lower().split(".")[-1]
     if ext == "pdf":
         return PyPDFLoader(file_path)
@@ -159,7 +167,9 @@ def get_loader_for_file(file_path: str, filename: str):
     else:
         return None
 
+
 def get_user_chain(user_id: int):
+    """Get or load the RAG chain for a user"""
     # 1. Already cached in memory? Use it.
     if user_id in user_chains:
         return user_chains[user_id]
@@ -176,6 +186,8 @@ def get_user_chain(user_id: int):
     # 3. No index at all — they haven't uploaded a document yet.
     return None
 
+
+# Upload and index document endpoint
 @app.post("/upload")
 async def upload_file(user_id: int = Form(...), file: UploadFile = File(...)):
     filename = file.filename
@@ -219,6 +231,8 @@ async def upload_file(user_id: int = Form(...), file: UploadFile = File(...)):
 
     return {"message": f"'{filename}' uploaded and indexed successfully.", "chunks_indexed": len(chunks)}
 
+
+# Query the RAG system endpoint
 @app.post("/query")
 def query_rag(req: QueryRequest):
     rag_chain = get_user_chain(req.user_id)
@@ -251,6 +265,8 @@ def query_rag(req: QueryRequest):
         cur.close()
         conn.close()
 
+
+# Root endpoint
 @app.get("/")
 def read_root():
-    return {"message": "welcome to fastapi.go to /docs to get started"}
+    return {"message": "Welcome to Document ChatBot API. Go to /docs for API documentation."}
