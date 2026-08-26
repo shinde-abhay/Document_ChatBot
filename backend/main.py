@@ -31,7 +31,17 @@ USER_INDEX_DIR = os.path.join(BASE_DIR, "user_indexes")
 os.makedirs(UPLOAD_DIR, exist_ok=True)
 os.makedirs(USER_INDEX_DIR, exist_ok=True)
 user_chains = {}
-
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=[
+        "https://document-chatbot-frontend-prod.up.railway.app",  # Railway prod
+        "http://localhost:8501",                                   # Local dev
+        "http://localhost:3000",                                   # Alternative local
+    ],
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
 print("Loading embeddings...")
 embeddings = HuggingFaceEmbeddings(model_name="sentence-transformers/all-MiniLM-L6-v2")
 
